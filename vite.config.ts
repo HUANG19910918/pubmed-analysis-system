@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from "vite-tsconfig-paths";
-import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -13,13 +12,6 @@ export default defineConfig({
       jsxRuntime: 'automatic'
     }),
     tsconfigPaths(),
-    // 包分析插件
-    visualizer({
-      filename: 'dist/stats.html',
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-    }),
   ],
   build: {
     // 设置合理的块大小警告限制
