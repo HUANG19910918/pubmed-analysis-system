@@ -8,6 +8,55 @@ export default defineConfig({
     react(),
     tsconfigPaths(),
   ],
+  build: {
+    // 提高块大小警告限制
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        // 手动分块配置，将大型依赖分离到单独的块中
+        manualChunks: {
+          // AI SDK 相关
+          'ai-vendors': [
+            '@anthropic-ai/sdk',
+            '@google/generative-ai', 
+            'openai'
+          ],
+          // React 生态系统
+          'react-vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+            'react-hook-form'
+          ],
+          // 图表库
+          'charts': [
+            'chart.js',
+            'react-chartjs-2',
+            'recharts',
+            'chartjs-adapter-date-fns'
+          ],
+          // 工具库
+          'utils': [
+            'axios',
+            '@tanstack/react-query',
+            'date-fns',
+            'clsx',
+            'tailwind-merge',
+            'zustand',
+            'sonner'
+          ],
+          // Supabase
+          'supabase': ['@supabase/supabase-js'],
+          // 图标库
+          'icons': ['lucide-react']
+        }
+      }
+    },
+    // 启用源码映射以便调试
+    sourcemap: false, // 生产环境关闭源码映射以减少包大小
+    // 压缩配置 - 使用默认的 esbuild 压缩器
+    minify: 'esbuild'
+  },
   server: {
     proxy: {
       '/api': {
