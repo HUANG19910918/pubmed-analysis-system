@@ -1,0 +1,2 @@
+# Exclude API source files from being treated as serverless functions
+api/src/

@@ -16,8 +16,5 @@
   },
   "env": {
     "NODE_ENV": "production"
-  },
-  "excludeFiles": [
-    "api/src/**"
-  ]
+  }
 }
