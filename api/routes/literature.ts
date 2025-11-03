@@ -23,7 +23,7 @@ router.get('/search', async (req, res) => {
     }
 
     const results = await pubmedService.searchArticles(
-      query,
+      query as string,
       parseInt(maxResults as string),
       parseInt(startIndex as string),
       startDate as string,

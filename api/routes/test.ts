@@ -43,7 +43,7 @@ router.post('/deepseek', async (req, res) => {
           success: true,
           message: 'DeepSeek连接测试成功',
           data: {
-            response: testResponse[0].content
+            response: testResponse
           }
         });
       } else {

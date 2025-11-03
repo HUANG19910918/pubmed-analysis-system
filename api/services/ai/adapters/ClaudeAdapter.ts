@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { BaseAdapter } from '../BaseAdapter.js';
 import { 
   ModelConfig, 
+  ModelInfo,
   ConnectionResult, 
   GenerationOptions, 
   GenerationResult 
@@ -62,12 +63,14 @@ export class ClaudeAdapter extends BaseAdapter {
       if (response.content && response.content.length > 0) {
         return {
           success: true,
-          message: 'Claude连接成功',
           modelInfo: {
-            name: 'Claude',
-            model: testConfig.model || 'claude-3-haiku-20240307',
+            name: testConfig.model || 'claude-3-haiku-20240307',
+            provider: 'Anthropic',
             version: response.model || 'unknown',
-            provider: 'Anthropic'
+            description: `Anthropic ${testConfig.model || 'claude-3-haiku-20240307'} model`,
+            maxTokens: this.getMaxTokensForModel(testConfig.model || 'claude-3-haiku-20240307'),
+            costPer1kTokens: this.getCostPer1kTokens(testConfig.model || 'claude-3-haiku-20240307'),
+            supportedFeatures: ['text-generation', 'chat', 'function-calling']
           }
         };
       } else {
@@ -159,9 +162,53 @@ export class ClaudeAdapter extends BaseAdapter {
   }
 
   /**
+   * 获取模型信息
+   */
+  getModelInfo(): ModelInfo {
+    const model = this.config.model || 'claude-3-haiku-20240307';
+    return {
+      name: model,
+      provider: 'Anthropic',
+      version: '1.0',
+      description: `Anthropic ${model} model`,
+      maxTokens: this.getMaxTokensForModel(model),
+      costPer1kTokens: this.getCostPer1kTokens(model),
+      supportedFeatures: ['text-generation', 'chat', 'function-calling']
+    };
+  }
+
+  /**
+   * 获取模型最大token数
+   */
+  private getMaxTokensForModel(model: string): number {
+    const tokenLimits: Record<string, number> = {
+      'claude-3-haiku-20240307': 200000,
+      'claude-3-sonnet-20240229': 200000,
+      'claude-3-opus-20240229': 200000,
+      'claude-3-5-sonnet-20241022': 200000,
+      'claude-3-5-haiku-20241022': 200000
+    };
+    return tokenLimits[model] || 200000;
+  }
+
+  /**
+   * 获取每1k token成本
+   */
+  private getCostPer1kTokens(model: string): number {
+    const pricing: Record<string, number> = {
+      'claude-3-haiku-20240307': 0.00025,
+      'claude-3-sonnet-20240229': 0.003,
+      'claude-3-opus-20240229': 0.015,
+      'claude-3-5-sonnet-20241022': 0.003,
+      'claude-3-5-haiku-20241022': 0.001
+    };
+    return pricing[model] || 0.00025;
+  }
+
+  /**
    * 计算Claude成本
    */
-  protected calculateCost(usage: { promptTokens: number; completionTokens: number }): number {
+  calculateCost(usage: { promptTokens: number; completionTokens: number }): number {
     const model = this.config.model || 'claude-3-haiku-20240307';
     
     // Anthropic定价 (截至2024年，实际使用时应更新为最新价格)

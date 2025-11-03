@@ -2,6 +2,7 @@ import axios from 'axios';
 import { BaseAdapter } from '../BaseAdapter.js';
 import { 
   ModelConfig, 
+  ModelInfo,
   ConnectionResult, 
   GenerationOptions, 
   GenerationResult 
@@ -50,8 +51,7 @@ export class DeepSeekAdapter extends BaseAdapter {
       if (!testConfig.apiKey || testConfig.apiKey === 'sk-test-key-for-development' || testConfig.apiKey.startsWith('sk-test-')) {
         console.log('DeepSeek测试连接：使用模拟响应（测试模式）');
         return {
-          success: true,
-          message: 'DeepSeek连接测试成功（测试模式）'
+          success: true
         };
       }
       
@@ -82,12 +82,14 @@ export class DeepSeekAdapter extends BaseAdapter {
       if (response.data.choices && response.data.choices.length > 0) {
         return {
           success: true,
-          message: 'DeepSeek连接成功',
           modelInfo: {
-            name: 'DeepSeek',
-            model: model,
+            name: model,
+            provider: 'DeepSeek',
             version: response.data.model || 'unknown',
-            provider: 'DeepSeek'
+            description: `DeepSeek ${model} model`,
+            maxTokens: 32768,
+            costPer1kTokens: 0.0014,
+            supportedFeatures: ['text-generation', 'chat', 'code-generation']
           }
         };
       } else {
@@ -223,9 +225,25 @@ export class DeepSeekAdapter extends BaseAdapter {
   }
 
   /**
+   * 获取模型信息
+   */
+  getModelInfo(): ModelInfo {
+    const model = this.config.model || 'deepseek-chat';
+    return {
+      name: model,
+      provider: 'DeepSeek',
+      version: '1.0',
+      description: `DeepSeek ${model} model`,
+      maxTokens: 32768,
+      costPer1kTokens: 0.0014,
+      supportedFeatures: ['text-generation', 'chat', 'code-generation']
+    };
+  }
+
+  /**
    * 计算DeepSeek成本
    */
-  protected calculateCost(usage: { promptTokens: number; completionTokens: number }): number {
+  calculateCost(usage: { promptTokens: number; completionTokens: number }): number {
     // DeepSeek定价 (截至2024年，实际使用时应更新为最新价格)
     // DeepSeek通常价格较低
     const promptCost = (usage.promptTokens / 1000) * 0.0014; // $0.0014 per 1K prompt tokens

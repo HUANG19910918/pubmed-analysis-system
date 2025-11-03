@@ -2,6 +2,7 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { BaseAdapter } from '../BaseAdapter.js';
 import { 
   ModelConfig, 
+  ModelInfo,
   ConnectionResult, 
   GenerationOptions, 
   GenerationResult 
@@ -55,12 +56,14 @@ export class GeminiAdapter extends BaseAdapter {
       if (response.text()) {
         return {
           success: true,
-          message: 'Gemini连接成功',
           modelInfo: {
-            name: 'Gemini',
-            model: modelName,
+            name: modelName,
+            provider: 'Google',
             version: modelName,
-            provider: 'Google'
+            description: `Google ${modelName} model`,
+            maxTokens: this.getMaxTokensForModel(modelName),
+            costPer1kTokens: this.getCostPer1kTokens(modelName),
+            supportedFeatures: ['text-generation', 'chat', 'multimodal']
           }
         };
       } else {
@@ -164,9 +167,49 @@ export class GeminiAdapter extends BaseAdapter {
   }
 
   /**
+   * 获取模型信息
+   */
+  getModelInfo(): ModelInfo {
+    const model = this.config.model || 'gemini-1.5-flash';
+    return {
+      name: model,
+      provider: 'Google',
+      version: '1.0',
+      description: `Google ${model} model`,
+      maxTokens: this.getMaxTokensForModel(model),
+      costPer1kTokens: this.getCostPer1kTokens(model),
+      supportedFeatures: ['text-generation', 'chat', 'multimodal']
+    };
+  }
+
+  /**
+   * 获取模型最大token数
+   */
+  private getMaxTokensForModel(model: string): number {
+    const tokenLimits: Record<string, number> = {
+      'gemini-1.5-flash': 1048576,
+      'gemini-1.5-pro': 2097152,
+      'gemini-1.0-pro': 32768
+    };
+    return tokenLimits[model] || 1048576;
+  }
+
+  /**
+   * 获取每1k token成本
+   */
+  private getCostPer1kTokens(model: string): number {
+    const pricing: Record<string, number> = {
+      'gemini-1.5-flash': 0.000075,
+      'gemini-1.5-pro': 0.00125,
+      'gemini-1.0-pro': 0.0005
+    };
+    return pricing[model] || 0.000075;
+  }
+
+  /**
    * 计算Gemini成本
    */
-  protected calculateCost(usage: { promptTokens: number; completionTokens: number }): number {
+  calculateCost(usage: { promptTokens: number; completionTokens: number }): number {
     const model = this.config.model || 'gemini-1.5-flash';
     
     // Google AI定价 (截至2024年，实际使用时应更新为最新价格)

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { BaseAdapter } from '../BaseAdapter.js';
 import { 
   ModelConfig, 
+  ModelInfo,
   ConnectionResult, 
   GenerationOptions, 
   GenerationResult 
@@ -62,12 +63,14 @@ export class OpenAIAdapter extends BaseAdapter {
       if (response.choices && response.choices.length > 0) {
         return {
           success: true,
-          message: 'OpenAI连接成功',
           modelInfo: {
-            name: 'OpenAI',
-            model: testConfig.model || 'gpt-3.5-turbo',
+            name: testConfig.model || 'gpt-3.5-turbo',
+            provider: 'OpenAI',
             version: response.model || 'unknown',
-            provider: 'OpenAI'
+            description: `OpenAI ${testConfig.model || 'gpt-3.5-turbo'} model`,
+            maxTokens: this.getMaxTokensForModel(testConfig.model || 'gpt-3.5-turbo'),
+            costPer1kTokens: this.getCostPer1kTokens(testConfig.model || 'gpt-3.5-turbo'),
+            supportedFeatures: ['text-generation', 'chat', 'function-calling']
           }
         };
       } else {
@@ -154,9 +157,57 @@ export class OpenAIAdapter extends BaseAdapter {
   }
 
   /**
+   * 获取模型信息
+   */
+  getModelInfo(): ModelInfo {
+    const model = this.config.model || 'gpt-3.5-turbo';
+    return {
+      name: model,
+      provider: 'OpenAI',
+      version: '1.0',
+      description: `OpenAI ${model} model`,
+      maxTokens: this.getMaxTokensForModel(model),
+      costPer1kTokens: this.getCostPer1kTokens(model),
+      supportedFeatures: ['text-generation', 'chat', 'function-calling']
+    };
+  }
+
+  /**
+   * 获取模型最大token数
+   */
+  private getMaxTokensForModel(model: string): number {
+    const tokenLimits: Record<string, number> = {
+      'gpt-3.5-turbo': 4096,
+      'gpt-3.5-turbo-16k': 16384,
+      'gpt-4': 8192,
+      'gpt-4-32k': 32768,
+      'gpt-4-turbo': 128000,
+      'gpt-4o': 128000,
+      'gpt-4o-mini': 128000
+    };
+    return tokenLimits[model] || 4096;
+  }
+
+  /**
+   * 获取每1k token成本
+   */
+  private getCostPer1kTokens(model: string): number {
+    const pricing: Record<string, number> = {
+      'gpt-3.5-turbo': 0.0015,
+      'gpt-3.5-turbo-16k': 0.003,
+      'gpt-4': 0.03,
+      'gpt-4-32k': 0.06,
+      'gpt-4-turbo': 0.01,
+      'gpt-4o': 0.005,
+      'gpt-4o-mini': 0.00015
+    };
+    return pricing[model] || 0.0015;
+  }
+
+  /**
    * 计算OpenAI成本
    */
-  protected calculateCost(usage: { promptTokens: number; completionTokens: number }): number {
+  calculateCost(usage: { promptTokens: number; completionTokens: number }): number {
     const model = this.config.model || 'gpt-3.5-turbo';
     
     // OpenAI定价 (截至2024年，实际使用时应更新为最新价格)
