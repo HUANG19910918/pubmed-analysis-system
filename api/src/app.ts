@@ -11,7 +11,6 @@ import cors from 'cors'
 import path from 'path'
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
-import authRoutes from './routes/auth'
 import literatureRoutes from './routes/literature'
 import testRoutes from './routes/test'
 import aiRoutes from './routes/ai'
@@ -32,7 +31,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 /**
  * API Routes
  */
-app.use('/api/auth', authRoutes)
 app.use('/api/literature', literatureRoutes)
 app.use('/api/test', testRoutes)
 app.use('/api/ai', aiRoutes)

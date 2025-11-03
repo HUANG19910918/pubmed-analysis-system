@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileText, Brain, TrendingUp, BookOpen, Loader2, Settings, ChevronDown, CheckCircle, XCircle, Zap, Calendar, RotateCcw, Square, CheckSquare, Minus, ChevronLeft, ChevronRight, BarChart3, PieChart, Cloud, Activity } from 'lucide-react';
+import { Search, FileText, Brain, TrendingUp, BookOpen, Loader2, Settings, ChevronDown, CheckCircle, XCircle, Zap, Calendar, RotateCcw, Square, CheckSquare, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import KeywordBarChart from '../components/KeywordBarChart';
-import KeywordPieChart from '../components/KeywordPieChart';
-import KeywordWordCloud from '../components/KeywordWordCloud';
-import KeywordTrendChart from '../components/KeywordTrendChart';
+import { log } from '../utils/logger';
 
 
 interface Article {
@@ -84,12 +81,7 @@ export default function Home() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(0);
 
-  // 关键词分析相关状态
-  const [keywordAnalysis, setKeywordAnalysis] = useState<any>(null);
-  const [isAnalyzingKeywords, setIsAnalyzingKeywords] = useState(false);
-  
-  // 可视化视图状态
-  const [visualizationView, setVisualizationView] = useState<'list' | 'bar' | 'pie' | 'cloud' | 'trend'>('list');
+
 
 
 
@@ -178,7 +170,7 @@ export default function Home() {
           }
         }
       } catch (error) {
-        console.error('❌ 加载搜索配置失败:', error);
+        log.error('加载搜索配置失败', error);
       }
     };
     
@@ -226,7 +218,7 @@ export default function Home() {
         }
       }
     } catch (error) {
-      console.error('Failed to load AI models:', error);
+      log.error('加载AI模型失败', error);
     }
   };
 
@@ -327,21 +319,7 @@ export default function Home() {
     return hasTimeFilter || hasJournalFilter;
   };
 
-  // 处理关键词点击搜索
-  const handleKeywordSearch = async (keyword: string) => {
-    setSearchQuery(keyword);
-    setActiveTab('search');
-    setCurrentPage(1); // 重置到第一页
-    
-    // 清除之前的搜索结果和选择
-    setSearchResults(null);
-    setSelectedArticles([]);
-    
-    // 等待状态更新后执行搜索
-    setTimeout(async () => {
-      await performSearch(1, true);
-    }, 100);
-  };
+
 
   // 执行搜索的核心函数，支持分页
   const performSearch = async (page: number = 1, resetPage: boolean = false) => {
@@ -406,10 +384,10 @@ export default function Home() {
           setCurrentPage(page);
         }
       } else {
-        console.error('❌ 搜索失败:', data.message);
+        log.error('搜索失败', null, { message: data.message });
       }
     } catch (error) {
-      console.error('Search error:', error);
+      log.error('搜索错误', error);
     } finally {
       setIsSearching(false);
     }
@@ -501,8 +479,10 @@ export default function Home() {
   const handleSingleModelAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      console.log('开始AI分析，选中文章数量:', selectedArticles.length);
-      console.log('使用模型:', selectedModel);
+      log.userAction('开始AI分析', { 
+        selectedArticlesCount: selectedArticles.length, 
+        selectedModel 
+      });
       
       // 从localStorage获取AI模型配置
       const savedConfig = localStorage.getItem('ai-models-config');
@@ -510,13 +490,13 @@ export default function Home() {
       if (savedConfig) {
         try {
           modelConfigs = JSON.parse(savedConfig);
-          console.log('加载的AI模型配置:', modelConfigs);
+          log.debug('加载AI模型配置', { configCount: modelConfigs.length });
         } catch (error) {
-          console.error('解析AI模型配置失败:', error);
+          log.error('解析AI模型配置失败', error);
         }
       }
       
-      console.log('准备发送API请求...');
+      log.debug('准备发送API请求');
       
       // 始终使用包含完整文献信息的详细prompt
       const analysisPrompt = buildAnalysisPrompt(selectedArticles);
@@ -531,9 +511,10 @@ export default function Home() {
         }
       };
       
-      console.log('请求体大小:', JSON.stringify(requestBody).length, '字符');
-      console.log('使用详细prompt，包含完整文献信息');
+      const requestSize = JSON.stringify(requestBody).length;
+      log.debug('发送AI分析请求', { requestSize: `${requestSize}字符` });
       
+      const startTime = Date.now();
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: {
@@ -542,107 +523,33 @@ export default function Home() {
         body: JSON.stringify(requestBody)
       });
 
-      console.log('API响应状态:', response.status);
+      const duration = Date.now() - startTime;
+      log.apiRequest('POST', '/api/ai/generate', duration, response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('API响应数据:', data);
       
       if (data.success) {
         setAnalysis(data.data.text);
         setActiveTab('analysis');
-        console.log('分析成功完成');
+        log.userAction('AI分析完成', { duration: `${duration}ms` });
       } else {
         const errorMessage = data.error || data.message || '未知错误';
-        console.error('Analysis failed:', errorMessage);
+        log.error('AI分析失败', null, { errorMessage });
         alert(`分析失败: ${errorMessage}`);
       }
     } catch (error) {
-      console.error('Analysis error:', error);
+      log.error('AI分析错误', error);
       alert('分析过程中发生错误，请检查网络连接或稍后重试');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // 关键词分析函数
-  const handleKeywordAnalysis = async () => {
-    if (selectedArticles.length === 0) {
-      alert('请先选择要分析的文献');
-      return;
-    }
 
-    console.log('开始关键词分析，选中文章数量:', selectedArticles.length);
-    console.log('选中的文章:', selectedArticles.map(a => ({ pmid: a.pmid, title: a.title })));
-
-    setIsAnalyzingKeywords(true);
-    try {
-      const requestBody = {
-        articles: selectedArticles,
-        options: {
-          minWordLength: 3,
-          maxWordFrequency: 0.8,
-          maxDocumentFrequency: 0.8,
-          topPercentage: 0.4,
-          language: 'mixed'
-        }
-      };
-
-      console.log('发送关键词分析请求:', requestBody);
-
-      const response = await fetch('/api/literature/keywords', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      console.log('关键词分析响应状态:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('关键词分析HTTP错误:', response.status, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('关键词分析响应数据:', data);
-      
-      if (data.success) {
-        console.log('关键词分析成功，结果:', data.data);
-        console.log('提取的关键词数量:', data.data.keywords?.length || 0);
-        
-        if (data.data.keywords && data.data.keywords.length > 0) {
-          console.log('前5个关键词:', data.data.keywords.slice(0, 5));
-          setKeywordAnalysis({
-            keywords: data.data.keywords,
-            totalKeywords: data.data.stats?.totalUniqueWords || data.data.keywords.length,
-            filteredKeywords: data.data.keywords.length,
-            totalDocuments: data.data.stats?.totalDocuments || selectedArticles.length,
-            totalWords: Math.round(data.data.stats?.averageWordsPerDocument * selectedArticles.length) || 0
-          });
-          console.log('关键词分析状态已更新');
-        } else {
-          console.warn('关键词分析成功但没有提取到关键词');
-          alert('关键词分析完成，但没有提取到有效的关键词。这可能是因为文档内容过短或过滤条件过于严格。');
-        }
-      } else {
-        const errorMessage = data.error || data.message || '未知错误';
-        console.error('关键词分析业务逻辑错误:', errorMessage);
-        alert(`关键词分析失败: ${errorMessage}`);
-      }
-    } catch (error) {
-      console.error('关键词分析网络错误:', error);
-      alert(`关键词分析过程中发生错误: ${error.message || '请检查网络连接或稍后重试'}`);
-    } finally {
-      setIsAnalyzingKeywords(false);
-      console.log('关键词分析流程结束');
-    }
-  };
 
   const buildAnalysisPrompt = (articles: Article[]): string => {
     // 构建文献信息，确保每篇文献都包含完整信息
@@ -1246,199 +1153,7 @@ ${literatureText}
               )}
             </div>
 
-            {/* 关键词统计分析 */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  关键词统计分析
-                </h2>
-                <button
-                  onClick={handleKeywordAnalysis}
-                  disabled={selectedArticles.length === 0 || isAnalyzingKeywords}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isAnalyzingKeywords ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      分析中...
-                    </>
-                  ) : (
-                    '开始关键词分析'
-                  )}
-                </button>
-              </div>
 
-              {keywordAnalysis ? (
-                <div className="space-y-6">
-                  {/* 统计信息 */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{keywordAnalysis.totalKeywords}</div>
-                      <div className="text-sm text-blue-600">总关键词数</div>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">{keywordAnalysis.filteredKeywords}</div>
-                      <div className="text-sm text-green-600">筛选后关键词</div>
-                    </div>
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">{keywordAnalysis.totalDocuments}</div>
-                      <div className="text-sm text-purple-600">分析文档数</div>
-                    </div>
-                    <div className="bg-orange-50 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">{keywordAnalysis.totalWords}</div>
-                      <div className="text-sm text-orange-600">总词汇数</div>
-                    </div>
-                  </div>
-
-                  {/* 可视化标签页 */}
-                  <div className="border-b border-gray-200">
-                    <nav className="flex space-x-8">
-                      <button
-                        onClick={() => setVisualizationView('list')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                          visualizationView === 'list'
-                            ? 'border-indigo-500 text-indigo-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        列表视图
-                      </button>
-                      <button
-                        onClick={() => setVisualizationView('bar')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                          visualizationView === 'bar'
-                            ? 'border-indigo-500 text-indigo-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        <BarChart3 className="mr-2 h-4 w-4" />
-                        柱状图
-                      </button>
-                      <button
-                        onClick={() => setVisualizationView('pie')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                          visualizationView === 'pie'
-                            ? 'border-indigo-500 text-indigo-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        <PieChart className="mr-2 h-4 w-4" />
-                        饼图
-                      </button>
-                      <button
-                        onClick={() => setVisualizationView('cloud')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                          visualizationView === 'cloud'
-                            ? 'border-indigo-500 text-indigo-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        <Cloud className="mr-2 h-4 w-4" />
-                        词云图
-                      </button>
-                      <button
-                        onClick={() => setVisualizationView('trend')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                          visualizationView === 'trend'
-                            ? 'border-indigo-500 text-indigo-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        <Activity className="mr-2 h-4 w-4" />
-                        趋势图
-                      </button>
-                    </nav>
-                  </div>
-
-                  {/* 可视化内容 */}
-                  <div className="mt-6">
-                    {visualizationView === 'list' && (
-                      <div>
-                        <h3 className="text-md font-medium text-gray-900 mb-3">高频关键词 (TF-IDF排序)</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {keywordAnalysis.keywords.slice(0, 30).map((keyword: any, index: number) => (
-                            <div
-                              key={index}
-                              className="bg-gray-50 p-3 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
-                              onClick={() => handleKeywordSearch(keyword.word)}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="font-medium text-gray-900">{keyword.word}</div>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    TF-IDF: {keyword.tfidf.toFixed(4)}
-                                  </div>
-                                </div>
-                                <div className="text-right text-xs text-gray-500">
-                                  <div>频次: {keyword.frequency}</div>
-                                  <div>文档: {keyword.documentCount}</div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {visualizationView === 'bar' && (
-                      <div>
-                        <h3 className="text-md font-medium text-gray-900 mb-3">关键词TF-IDF分数柱状图</h3>
-                        <KeywordBarChart 
-                          keywords={keywordAnalysis.keywords} 
-                          onKeywordClick={handleKeywordSearch}
-                        />
-                      </div>
-                    )}
-
-                    {visualizationView === 'pie' && (
-                      <div>
-                        <h3 className="text-md font-medium text-gray-900 mb-3">关键词分布饼图</h3>
-                        <KeywordPieChart 
-                          keywords={keywordAnalysis.keywords} 
-                          onKeywordClick={handleKeywordSearch}
-                        />
-                      </div>
-                    )}
-
-                    {visualizationView === 'cloud' && (
-                      <div>
-                        <h3 className="text-md font-medium text-gray-900 mb-3">关键词云图</h3>
-                        <KeywordWordCloud 
-                          keywords={keywordAnalysis.keywords} 
-                          onKeywordClick={handleKeywordSearch}
-                        />
-                      </div>
-                    )}
-
-                    {visualizationView === 'trend' && (
-                      <div>
-                        <h3 className="text-md font-medium text-gray-900 mb-3">关键词趋势分析</h3>
-                        <KeywordTrendChart 
-                          keywords={keywordAnalysis.keywords} 
-                          onKeywordClick={handleKeywordSearch}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">关键词分析</h3>
-                  <p className="text-gray-500">
-                    选择文献后点击"开始关键词分析"按钮获取TF-IDF关键词统计
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
         )}
 

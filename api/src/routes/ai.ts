@@ -83,127 +83,103 @@ router.get('/models', (req, res) => {
   }
 });
 
+
+
 /**
- * 获取特定模型的状态
+ * 通用模型管理端点 - 支持多种操作
  */
-router.get('/models/:modelName/status', (req, res) => {
+router.all('/models/:modelName/:action?', async (req, res) => {
   try {
-    const { modelName } = req.params;
-    const status = aiManager.getModelStatus(modelName);
+    const { modelName, action } = req.params;
+    const method = req.method.toLowerCase();
     
-    if (!status) {
-      return res.status(404).json({
-        success: false,
-        error: `模型 ${modelName} 未找到`
+    // 获取模型状态
+    if (method === 'get' && (!action || action === 'status')) {
+      const status = aiManager.getModelStatus(modelName);
+      
+      if (!status) {
+        return res.status(404).json({
+          success: false,
+          error: `模型 ${modelName} 未找到`
+        });
+      }
+      
+      return res.json({
+        success: true,
+        data: status
       });
     }
     
-    res.json({
-      success: true,
-      data: status
+    // 获取模型配置
+    if (method === 'get' && action === 'config') {
+      const config = aiManager.getModelConfig(modelName);
+      
+      if (!config) {
+        return res.status(404).json({
+          success: false,
+          error: `模型 ${modelName} 未找到`
+        });
+      }
+      
+      // 不返回完整的API密钥，只返回脱敏信息
+      const safeConfig = {
+        ...config,
+        apiKey: config.apiKey ? `${config.apiKey.substring(0, 8)}...` : ''
+      };
+      
+      return res.json({
+        success: true,
+        data: safeConfig
+      });
+    }
+    
+    // 更新模型配置
+    if (method === 'put' && action === 'config') {
+      const config: ModelConfig = req.body;
+      
+      if (!config.apiKey) {
+        return res.status(400).json({
+          success: false,
+          error: 'API密钥不能为空'
+        });
+      }
+      
+      aiManager.updateModelConfig(modelName, config);
+      
+      return res.json({
+        success: true,
+        message: `模型 ${modelName} 配置已更新`
+      });
+    }
+    
+    // 测试模型连接
+    if (method === 'post' && action === 'test') {
+      const config: ModelConfig = req.body;
+      
+      const result = await aiManager.testModelConnection(modelName, config);
+      
+      return res.json({
+        success: true,
+        data: result
+      });
+    }
+    
+    // 不支持的操作
+    return res.status(400).json({
+      success: false,
+      error: `不支持的操作: ${method.toUpperCase()} ${action || 'status'}`
     });
+    
   } catch (error) {
-    console.error('获取模型状态失败:', error);
+    console.error('模型管理操作失败:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : '获取模型状态失败'
+      error: error instanceof Error ? error.message : '模型管理操作失败'
     });
   }
 });
 
-/**
- * 测试AI模型连接
- */
-router.post('/models/:modelName/test', async (req, res) => {
-  try {
-    const { modelName } = req.params;
-    const config: ModelConfig = req.body;
-    
-    if (!config.apiKey) {
-      return res.status(400).json({
-        success: false,
-        error: 'API密钥不能为空'
-      });
-    }
-    
-    const result = await aiManager.testModelConnection(modelName, config);
-    
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('测试AI模型连接失败:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : '测试AI模型连接失败'
-    });
-  }
-});
 
-/**
- * 更新AI模型配置
- */
-router.put('/models/:modelName/config', (req, res) => {
-  try {
-    const { modelName } = req.params;
-    const config: ModelConfig = req.body;
-    
-    if (!config.apiKey) {
-      return res.status(400).json({
-        success: false,
-        error: 'API密钥不能为空'
-      });
-    }
-    
-    aiManager.updateModelConfig(modelName, config);
-    
-    res.json({
-      success: true,
-      message: `模型 ${modelName} 配置已更新`
-    });
-  } catch (error) {
-    console.error('更新AI模型配置失败:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : '更新AI模型配置失败'
-    });
-  }
-});
-
-/**
- * 获取AI模型配置
- */
-router.get('/models/:modelName/config', (req, res) => {
-  try {
-    const { modelName } = req.params;
-    const config = aiManager.getModelConfig(modelName);
-    
-    if (!config) {
-      return res.status(404).json({
-        success: false,
-        error: `模型 ${modelName} 未找到`
-      });
-    }
-    
-    // 不返回完整的API密钥，只返回脱敏信息
-    const safeConfig = {
-      ...config,
-      apiKey: config.apiKey ? `${config.apiKey.substring(0, 8)}...` : ''
-    };
-    
-    res.json({
-      success: true,
-      data: safeConfig
-    });
-  } catch (error) {
-    console.error('获取AI模型配置失败:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : '获取AI模型配置失败'
-    });
-  }
-});
 
 /**
  * 使用指定模型生成文本
@@ -257,73 +233,47 @@ router.post('/generate', async (req, res) => {
   }
 });
 
+
+
 /**
- * 批量分析文献
+ * 缓存管理端点 - 支持获取统计和清理操作
  */
-router.post('/analyze/batch', async (req, res) => {
+router.all('/cache/:action?', (req, res) => {
   try {
-    const { items, options = {}, preferredModel } = req.body;
+    const { action } = req.params;
+    const method = req.method.toLowerCase();
     
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: '分析项目不能为空'
+    // 获取缓存统计信息
+    if (method === 'get' && (!action || action === 'stats')) {
+      const stats = aiManager.getCacheStats();
+      
+      return res.json({
+        success: true,
+        data: stats
       });
     }
     
-    const result = await aiManager.batchAnalyze(items, { ...options, preferredModel });
+    // 清理缓存
+    if (method === 'delete' && (!action || action === 'clear')) {
+      aiManager.clearCache();
+      
+      return res.json({
+        success: true,
+        message: '缓存已清理'
+      });
+    }
     
-    res.json({
-      success: true,
-      data: result
+    // 不支持的操作
+    return res.status(400).json({
+      success: false,
+      error: `不支持的缓存操作: ${method.toUpperCase()} ${action || ''}`
     });
+    
   } catch (error) {
-    console.error('AI批量分析失败:', error);
+    console.error('缓存管理操作失败:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'AI批量分析失败'
-    });
-  }
-});
-
-
-
-/**
- * 获取缓存统计
- */
-router.get('/cache/stats', (req, res) => {
-  try {
-    const stats = aiManager.getCacheStats();
-    
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    console.error('获取缓存统计失败:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : '获取缓存统计失败'
-    });
-  }
-});
-
-/**
- * 清理缓存
- */
-router.delete('/cache', (req, res) => {
-  try {
-    aiManager.clearCache();
-    
-    res.json({
-      success: true,
-      message: '缓存已清理'
-    });
-  } catch (error) {
-    console.error('清理缓存失败:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : '清理缓存失败'
+      error: error instanceof Error ? error.message : '缓存管理操作失败'
     });
   }
 });

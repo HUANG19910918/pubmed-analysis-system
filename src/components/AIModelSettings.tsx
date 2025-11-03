@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Eye, EyeOff, TestTube, Save, Trash2, Plus } from 'lucide-react';
+import { log } from '../utils/logger';
 
 interface AIModelConfig {
   name: string;
@@ -65,7 +66,7 @@ export default function AIModelSettings({ onConfigChange }: AIModelSettingsProps
         const parsedConfigs = JSON.parse(savedConfigs);
         setConfigs(parsedConfigs);
       } catch (error) {
-        console.error('Failed to parse AI models config:', error);
+        log.error('解析AI模型配置失败', error);
         initializeDefaultConfigs();
       }
     } else {

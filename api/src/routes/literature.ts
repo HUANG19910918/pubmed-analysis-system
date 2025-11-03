@@ -1,7 +1,6 @@
 import express from 'express';
 import pubmedService from '../services/pubmed.js';
 import deepseekService from '../services/deepseek.js';
-import { tfidfService } from '../services/tfidf.js';
 
 const router = express.Router();
 
@@ -290,130 +289,6 @@ router.post('/suggestions', async (req, res) => {
   }
 });
 
-// Extract keywords using TF-IDF algorithm
-router.post('/keywords', async (req, res) => {
-  try {
-    const { articles, options = {} } = req.body;
 
-    if (!articles || !Array.isArray(articles) || articles.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Articles array is required and cannot be empty'
-      });
-    }
-
-    // 验证文章数据结构
-    const validArticles = articles.filter(article => 
-      article && (article.title || article.abstract)
-    );
-
-    if (validArticles.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid articles found (articles must have title or abstract)'
-      });
-    }
-
-    // 提取文本内容用于TF-IDF分析
-    const documents = validArticles.map(article => {
-      const title = article.title || '';
-      const abstract = article.abstract || '';
-      const keywords = Array.isArray(article.keywords) ? article.keywords.join(' ') : '';
-      
-      // 合并标题、摘要和关键词
-      return [title, abstract, keywords].filter(text => text.trim()).join(' ');
-    });
-
-    // 设置TF-IDF选项
-    const tfidfOptions = {
-      minWordLength: options.minWordLength || 3,
-      maxWordFrequency: options.maxWordFrequency,
-      maxDocumentFrequency: options.maxDocumentFrequency || 0.8,
-      topPercentage: options.topPercentage || 0.35,
-      language: options.language || 'mixed'
-    };
-
-    console.log(`开始TF-IDF关键词提取，文档数量: ${documents.length}`);
-    console.log('TF-IDF选项:', tfidfOptions);
-
-    // 执行关键词提取
-    const keywords = tfidfService.extractKeywords(documents, tfidfOptions);
-
-    console.log(`关键词提取完成，提取到 ${keywords.length} 个关键词`);
-
-    // 添加统计信息
-    const stats = {
-      totalDocuments: documents.length,
-      totalUniqueWords: keywords.length,
-      averageWordsPerDocument: documents.reduce((sum, doc) => sum + doc.split(/\s+/).length, 0) / documents.length,
-      processingTime: Date.now()
-    };
-
-    res.json({
-      success: true,
-      data: {
-        keywords,
-        stats,
-        options: tfidfOptions
-      }
-    });
-
-  } catch (error) {
-    console.error('Keywords extraction error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to extract keywords',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Get stopwords list
-router.get('/keywords/stopwords', (req, res) => {
-  try {
-    const stopwords = tfidfService.getStopWords();
-    
-    res.json({
-      success: true,
-      data: {
-        stopwords,
-        count: stopwords.length
-      }
-    });
-  } catch (error) {
-    console.error('Get stopwords error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get stopwords'
-    });
-  }
-});
-
-// Add custom stopwords
-router.post('/keywords/stopwords', (req, res) => {
-  try {
-    const { words } = req.body;
-
-    if (!words || !Array.isArray(words)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Words array is required'
-      });
-    }
-
-    tfidfService.addStopWords(words);
-
-    res.json({
-      success: true,
-      message: `Added ${words.length} stopwords`
-    });
-  } catch (error) {
-    console.error('Add stopwords error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to add stopwords'
-    });
-  }
-});
 
 export default router;

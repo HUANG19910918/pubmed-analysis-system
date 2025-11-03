@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, TestTube, CheckCircle, XCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { Settings as SettingsIcon, Save, TestTube, CheckCircle, XCircle, Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-react';
+import { log } from '../utils/logger';
 import { Link } from 'react-router-dom';
-import AIModelSettings from '../components/AIModelSettings';
+
+// 动态导入 AI 模型设置组件
+const AIModelSettings = lazy(() => import('../components/AIModelSettings'));
 
 interface ConfigSettings {
   deepseekApiKey: string;
@@ -53,7 +56,7 @@ export default function Settings() {
         const parsedConfig = JSON.parse(savedConfig);
         setConfig(prev => ({ ...prev, ...parsedConfig }));
       } catch (error) {
-        console.error('Failed to parse saved config:', error);
+        log.error('解析保存的配置失败', error);
       }
     }
   }, []);
@@ -226,7 +229,16 @@ export default function Settings() {
           {/* AI模型配置区块 */}
           <div className="bg-white rounded-lg shadow-md">
             <div className="p-6">
-              <AIModelSettings />
+              <Suspense fallback={
+                <div className="flex items-center justify-center h-32">
+                  <div className="flex flex-col items-center space-y-2">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    <p className="text-sm text-gray-600">加载AI模型设置中...</p>
+                  </div>
+                </div>
+              }>
+                <AIModelSettings />
+              </Suspense>
             </div>
           </div>
 
