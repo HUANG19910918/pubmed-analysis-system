@@ -1,2 +1,2 @@
-# Exclude API source files from being treated as serverless functions
-api/src/
+# Note: We need api/src/ files for TypeScript compilation
+# Only api/index.ts should be treated as a serverless function
