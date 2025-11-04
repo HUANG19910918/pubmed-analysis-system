@@ -471,16 +471,24 @@ export default function Home() {
 
 
   const handleAnalyzeSelected = async () => {
-    if (selectedArticles.length === 0) return;
-    // 执行AI分析
-    await handleSingleModelAnalysis();
+    // 使用函数式更新来获取最新的selectedArticles状态
+    setSelectedArticles(currentSelected => {
+      if (currentSelected.length === 0) return currentSelected;
+      
+      // 立即执行AI分析，使用当前最新的选中文献
+      handleSingleModelAnalysis(currentSelected);
+      return currentSelected;
+    });
   };
 
-  const handleSingleModelAnalysis = async () => {
+  const handleSingleModelAnalysis = async (articlesToAnalyze?: Article[]) => {
+    // 如果没有传入参数，使用当前状态中的selectedArticles
+    const targetArticles = articlesToAnalyze || selectedArticles;
+    
     setIsAnalyzing(true);
     try {
       log.userAction('开始AI分析', { 
-        selectedArticlesCount: selectedArticles.length, 
+        selectedArticlesCount: targetArticles.length, 
         selectedModel 
       });
       
@@ -499,7 +507,7 @@ export default function Home() {
       log.debug('准备发送API请求');
       
       // 始终使用包含完整文献信息的详细prompt
-      const analysisPrompt = buildAnalysisPrompt(selectedArticles);
+      const analysisPrompt = buildAnalysisPrompt(targetArticles);
       
       const requestBody = {
         prompt: analysisPrompt,

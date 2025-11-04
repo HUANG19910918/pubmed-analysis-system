@@ -7,8 +7,6 @@ import { Link } from 'react-router-dom';
 const AIModelSettings = lazy(() => import('../components/AIModelSettings'));
 
 interface ConfigSettings {
-  deepseekApiKey: string;
-  deepseekBaseUrl: string;
   pubmedMaxResults: number;
   pubmedBaseUrl: string;
   pubmedApiKey: string;
@@ -20,14 +18,11 @@ interface ConfigSettings {
 }
 
 interface SystemStatus {
-  deepseekConnection: 'unknown' | 'connected' | 'error';
   pubmedConnection: 'unknown' | 'connected' | 'error';
 }
 
 export default function Settings() {
   const [config, setConfig] = useState<ConfigSettings>({
-    deepseekApiKey: '',
-    deepseekBaseUrl: 'https://api.deepseek.com',
     pubmedMaxResults: 20,
     pubmedBaseUrl: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/',
     pubmedApiKey: '',
@@ -39,7 +34,6 @@ export default function Settings() {
   });
 
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({
-    deepseekConnection: 'unknown',
     pubmedConnection: 'unknown'
   });
 
@@ -68,14 +62,6 @@ export default function Settings() {
 
     try {
       // 验证必填字段
-      if (!config.deepseekApiKey.trim()) {
-        throw new Error('DeepSeek API密钥不能为空');
-      }
-
-      if (!config.deepseekBaseUrl.trim()) {
-        throw new Error('DeepSeek API地址不能为空');
-      }
-
       if (!config.pubmedToolName.trim()) {
         throw new Error('PubMed工具名称不能为空');
       }
@@ -123,40 +109,18 @@ export default function Settings() {
   const handleTestConnections = async () => {
     setIsTesting(true);
     setSystemStatus({
-      deepseekConnection: 'unknown',
       pubmedConnection: 'unknown'
     });
 
-    // 测试DeepSeek连接
-    try {
-      const response = await fetch('/api/test/deepseek', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey: config.deepseekApiKey,
-          baseUrl: config.deepseekBaseUrl
-        })
-      });
-
-      if (response.ok) {
-        setSystemStatus(prev => ({ ...prev, deepseekConnection: 'connected' }));
-      } else {
-        setSystemStatus(prev => ({ ...prev, deepseekConnection: 'error' }));
-      }
-    } catch (error) {
-      setSystemStatus(prev => ({ ...prev, deepseekConnection: 'error' }));
-    }
-
     // 测试PubMed连接
     try {
-      const response = await fetch('/api/test/pubmed', {
+      const response = await fetch('/api/test/connection', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          service: 'pubmed',
           baseUrl: config.pubmedBaseUrl,
           apiKey: config.pubmedApiKey,
           toolName: config.pubmedToolName,
@@ -242,61 +206,8 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* 原有配置区块 */}
+          {/* PubMed API 配置区块 */}
           <div className="bg-white rounded-lg shadow-md">
-            {/* DeepSeek API 配置 */}
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">DeepSeek API 配置</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    API 密钥 *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      value={config.deepseekApiKey}
-                      onChange={(e) => setConfig(prev => ({ ...prev, deepseekApiKey: e.target.value }))}
-                      placeholder="sk-your-deepseek-api-key-here"
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showApiKey ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    API 基础地址
-                  </label>
-                  <input
-                    type="url"
-                    value={config.deepseekBaseUrl}
-                    onChange={(e) => setConfig(prev => ({ ...prev, deepseekBaseUrl: e.target.value }))}
-                    placeholder="https://api.deepseek.com"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(systemStatus.deepseekConnection)}
-                  <span className="text-sm text-gray-600">
-                    DeepSeek 连接状态: {getStatusText(systemStatus.deepseekConnection)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
             {/* PubMed API 配置 */}
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">PubMed API 配置</h2>
